@@ -30,8 +30,7 @@ const start = () => {
                 if (Array.from(joinedRooms).includes(roomID)) {
                     return console.warn('Вы уже присоединены к этой комнате')
                 }
-
-                Array.from(io.sockets.adapter.rooms.get(roomID)).forEach(clientID => {
+                Array.from(io.sockets.adapter.rooms.get(roomID) || []).forEach(clientID => {
                     io.to(clientID).emit(ACTIONS.ADD_PEER, {
                         peerID: socket.id,
                         createOffer: false,
