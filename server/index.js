@@ -43,28 +43,32 @@ const start = () => {
                 socket.join(roomID);
                 shareRooms();
             })
+            function leaveRoom() {
+                const { rooms: joinedRooms } = socket;
+                Array.from(joinedRooms).forEach(roomID => {
+                    io.sockets.adapter.rooms.get(roomID).forEach(clientID => {
+                        io.to(clientID).emit(ACTIONS.REMOVE_PEER, {
+                            peerID: socket.id
+                        })
+                        socket.emit(ACTIONS.REMOVE_PEER, {
+                            peerID: clientID
+                        })
+                    })
+                    socket.leave(roomID);
+                })
+                shareRooms();
+            }
+
+
+
+            io.on(ACTIONS.LEAVE, leaveRoom);
+            io.on("disconnection", leaveRoom);
+
+
+
         })
 
-        function leaveRoom(socket) {
-            const { rooms: joinedRooms } = socket;
-            Array.from(joinedRooms).forEach(roomID => {
-                io.sockets.adapter.rooms.get(roomID).forEach(clientID => {
-                    io.to(clientID).emit(ACTIONS.REMOVE_PEER, {
-                        peerID: socket.id
-                    })
-                    socket.emit(ACTIONS.REMOVE_PEER, {
-                        peerID: clientID
-                    })
-                })
-                socket.leave(roomID);
-            })
-            shareRooms();
-        }
 
-
-
-        io.on(ACTIONS.LEAVE, leaveRoom);
-        io.on("disconnection", leaveRoom);
         server.listen(PORT, () => {
             console.log(`Сервер запущен на порту ${PORT}`)
         })

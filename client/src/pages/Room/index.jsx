@@ -4,13 +4,14 @@ import useWebRTC, { LOCAL_MEDIA } from '../../hooks/useWebRTC';
 export default function Room() {
     const { id: roomID } = useParams();
     const { clients, createRefElement } = useWebRTC(roomID);
-    console.log(roomID)
+    console.log('ОТРИСОВКА КОМНАТЫ')
 
     return (
         <div>
             {clients.map(clientID => (<div key={clientID}>
                 <video
                     ref={instance => {
+                        console.log('ОТРИСОВКА Видео')
                         createRefElement(clientID, instance)
                     }}
                     autoPlay
