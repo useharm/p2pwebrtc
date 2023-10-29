@@ -30,7 +30,10 @@ const start = () => {
                 if (Array.from(joinedRooms).includes(roomID)) {
                     return console.warn('Вы уже присоединены к этой комнате')
                 }
-                Array.from(io.sockets.adapter.rooms.get(roomID) || []).forEach(clientID => {
+
+                const clients = Array.from(io.sockets.adapter.rooms.get(roomID) || []);
+
+                clients.forEach(clientID => {
                     io.to(clientID).emit(ACTIONS.ADD_PEER, {
                         peerID: socket.id,
                         createOffer: false,
@@ -44,9 +47,15 @@ const start = () => {
                 shareRooms();
             })
             function leaveRoom() {
-                const { rooms: joinedRooms } = socket;
-                Array.from(joinedRooms).forEach(roomID => {
-                    io.sockets.adapter.rooms.get(roomID).forEach(clientID => {
+                const { rooms } = socket;
+
+                Array.from(rooms).filter(roomID => uuid.validate(roomID) && uuid.version(roomID) === 4).forEach(roomID => {
+
+                    const clients = Array.from(io.sockets.adapter.rooms.get(roomID) || []);
+
+
+
+                    clients.forEach(clientID => {
                         io.to(clientID).emit(ACTIONS.REMOVE_PEER, {
                             peerID: socket.id
                         })
@@ -64,8 +73,20 @@ const start = () => {
             io.on(ACTIONS.LEAVE, leaveRoom);
             io.on("disconnection", leaveRoom);
 
+            io.on(ACTIONS.RELAY_SDP, ({ peerID, sessionDescription }) => {
+                io.to(peerID).emit(ACTIONS.SESSION_DESCRIPTION, {
+                    peerID: socket.id,
+                    sessionDescription
+                })
+            })
 
 
+            io.on(ACTIONS.RELAY_ICE, ({ peerID, iceCandidate }) => {
+                io.to(peerID).emit(ACTIONS.ICE_CANDIDATE, {
+                    peerID: socket.id,
+                    iceCandidate
+                })
+            })
         })
 
 

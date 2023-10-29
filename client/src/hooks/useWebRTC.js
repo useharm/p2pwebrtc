@@ -27,6 +27,7 @@ export default function useWebRTC(roomID) {
     useEffect(() => {
 
         async function handleNewPeer({ peerID, createOffer }) {
+            console.log('ADD NEW PEER', peerID, createOffer)
             if (peerID in peerConnections.current) {
                 return console.warn(`Already connected to peer ${peerID}`)
             }
@@ -34,6 +35,7 @@ export default function useWebRTC(roomID) {
                 iceServers: freeice(),
             })
             peerConnections.current[peerID].onicecandidate = (event) => {
+                console.log('new ice')
                 if (event.candidate) {
                     socket.emit(ACTIONS.RELAY_ICE, {
                         peerID,
@@ -44,18 +46,36 @@ export default function useWebRTC(roomID) {
 
             let tracksNumber = 0;
             peerConnections.current[peerID].ontrack = ({ streams: [remoteStream] }) => {
+                console.log('отрабатывает трек', remoteStream)
                 tracksNumber++;
 
                 if (tracksNumber === 2) { // video and audio tracks received
+                    console.log('добавляется чмо')
                     addNewClient(peerID, () => {
-                        peerMediaElements.current[peerID].srcObject = remoteStream;
+                        if (peerMediaElements.current[peerID]) {
+                            peerMediaElements.current[peerID].srcObject = remoteStream;
+                        } else {
+                            // FIX LONG RENDER IN CASE OF MANY CLIENTS
+                            let settled = false;
+                            const interval = setInterval(() => {
+                                if (peerMediaElements.current[peerID]) {
+                                    peerMediaElements.current[peerID].srcObject = remoteStream;
+                                    settled = true;
+                                }
+
+                                if (settled) {
+                                    clearInterval(interval);
+                                }
+                            }, 1000);
+                        }
                     })
                 }
             }
 
             localMediaStream.current.getTracks().forEach(track => {
-                peerConnections.current[peerID].addTrack(track, localMediaStream.current)
-            })
+                console.log('добавился трек', track)
+                peerConnections.current[peerID].addTrack(track, localMediaStream.current);
+            });
 
             if (createOffer) {
                 const offer = await peerConnections.current[peerID].createOffer();
@@ -69,6 +89,61 @@ export default function useWebRTC(roomID) {
         }
 
         socket.on(ACTIONS.ADD_PEER, handleNewPeer)
+        return () => {
+            socket.off(ACTIONS.ADD_PEER);
+        }
+    }, [])
+
+    useEffect(() => {
+        async function setRemoteMedia({ peerID, sessionDescription }) {
+            peerConnections.current[peerID]?.setRemoteDescription(new RTCSessionDescription(sessionDescription));
+
+
+            if (sessionDescription.type === 'offer') {
+                const answer = await peerConnections.current[peerID].createAnswer();
+                await peerConnections.current[peerID].setLocalDescription(answer);
+
+                socket.emit(ACTIONS.RELAY_SDP, {
+                    peerID,
+                    sessionDescription: answer
+                })
+            }
+        }
+
+
+        socket.on(ACTIONS.SESSION_DESCRIPTION, setRemoteMedia)
+        return () => {
+            socket.off(ACTIONS.SESSION_DESCRIPTION);
+        }
+    }, [])
+
+    useEffect(() => {
+
+
+        socket.on(ACTIONS.ICE_CANDIDATE, ({ peerID, iceCandidate }) => {
+            peerConnections.current[peerID].addIceCandidate(new RTCIceCandidate(iceCandidate))
+        })
+        return () => {
+            socket.off(ACTIONS.ICE_CANDIDATE);
+        }
+    }, [])
+
+    useEffect(() => {
+        function handleRemovePeer({ peerID }) {
+            if (peerConnections.current[peerID]) {
+                peerConnections.current[peerID].close()
+            }
+            delete peerConnections.current[peerID];
+            delete peerMediaElements.current[peerID];
+
+            setClients(list => list.filter(client => client !== peerID));
+        }
+
+
+        socket.on(ACTIONS.REMOVE_PEER, handleRemovePeer)
+        return () => {
+            socket.off(ACTIONS.REMOVE_PEER);
+        }
     }, [])
 
 

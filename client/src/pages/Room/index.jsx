@@ -8,17 +8,20 @@ export default function Room() {
 
     return (
         <div>
-            {clients.map(clientID => (<div key={clientID}>
-                <video
-                    ref={instance => {
-                        console.log('ОТРИСОВКА Видео')
-                        createRefElement(clientID, instance)
-                    }}
-                    autoPlay
-                    playsInline
-                    muted={clientID === LOCAL_MEDIA}
-                />
-            </div>))}
+            {clients.map(clientID => {
+                console.log(clients)
+                return (<div key={clientID}>
+                    <video
+                        ref={instance => {
+                            console.log('ОТРИСОВКА Видео')
+                            createRefElement(clientID, instance)
+                        }}
+                        autoPlay
+                        playsInline
+                        muted={clientID === LOCAL_MEDIA}
+                    />
+                </div>)
+            })}
         </div>
     )
 }
